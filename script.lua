@@ -1,88 +1,57 @@
+-- Auto lấy trái từ kho (ưu tiên Mythical -> Common) rồi reset (Blox Fruits)
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local CoreGui = game:GetService("CoreGui")
+local RS = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local CommF = RS:WaitForChild("Remotes"):WaitForChild("CommF_")
 
--- Màn trắng + chữ "wait a minute"
-local Screen = Instance.new("ScreenGui")
-Screen.Name = "WaitScreen"
-Screen.IgnoreGuiInset = true
-Screen.Parent = CoreGui
+local STOP_AFTER_FIRST = true   -- true: lấy được 1 trái là dừng | false: thử hết cả danh sách
+local DELAY_BETWEEN = 0.3
+local DELAY_BEFORE_RESET = 1.5
 
-local Frame = Instance.new("Frame", Screen)
-Frame.Size = UDim2.new(1, 0, 1, 0)
-Frame.BackgroundColor3 = Color3.new(1, 1, 1)
-Frame.BorderSizePixel = 0
+local FRUITS = {
+    -- MYTHICAL (thứ tự như trong shop, từ trên xuống)
+    "Kitsune-Kitsune", "Control-Control",
+    "Dragon-Dragon", "Dragon-Dragon (West)", "Dragon-Dragon (East)",
+    "Tiger-Tiger", "Yeti-Yeti", "Magnet-Magnet",
+    "Gas-Gas", "Spirit-Spirit", "Dough-Dough", "Shadow-Shadow", "Venom-Venom",
+    "Gravity-Gravity", "Mammoth-Mammoth", "T-Rex-T-Rex", "Leopard-Leopard",
 
-local Text = Instance.new("TextLabel", Frame)
-Text.Size = UDim2.new(1, 0, 1, 0)
-Text.BackgroundTransparency = 1
-Text.Text = "wait a minute"
-Text.TextColor3 = Color3.new(0, 0, 0)
-Text.TextScaled = true
-Text.Font = Enum.Font.GothamBold
+    -- LEGENDARY
+    "Quake-Quake", "Buddha-Buddha", "Love-Love", "Spider-Spider", "Sound-Sound",
+    "Phoenix-Phoenix", "Portal-Portal", "Rumble-Rumble", "Pain-Pain", "Blizzard-Blizzard",
 
--- Bảng điểm trái
-local Rank = {
-    ["Dragon"] = 100,
-    ["Kitsune"] = 97,
-    ["Control"] = 94,
-    ["Magnet"] = 91,
-    ["Tiger"] = 88,
-    ["Yeti"] = 86,
-    ["Gas"] = 83,
-    ["Dough"] = 80,
-    ["Venom"] = 77,
-    ["Spirit"] = 74,
-    ["T-Rex"] = 71,
-    ["Mammoth"] = 68,
-    ["Gravity"] = 65,
-    ["Shadow"] = 62,
-    ["Buddha"] = 58,
-    ["Portal"] = 55,
-    ["Lightning"] = 52,
-    ["Blizzard"] = 49,
-    ["Phoenix"] = 46,
-    ["Sound"] = 43
+    -- RARE
+    "Light-Light", "Rubber-Rubber", "Barrier-Barrier", "Ghost-Ghost", "Magma-Magma",
+
+    -- UNCOMMON
+    "Flame-Flame", "Falcon-Falcon", "Ice-Ice", "Sand-Sand", "Dark-Dark", "Diamond-Diamond",
+
+    -- COMMON
+    "Rocket-Rocket", "Spin-Spin", "Blade-Blade", "Spring-Spring",
+    "Bomb-Bomb", "Smoke-Smoke", "Spike-Spike",
 }
 
-local function getBestFruit()
-    local best, highest = nil, -1
-    local function check(container)
-        if not container then return end
-        for _, tool in ipairs(container:GetChildren()) do
-            if tool:IsA("Tool") and (tool.Name:find("Fruit") or tool.Name:find("-Fruit")) then
-                local name = tool.Name:gsub("-Fruit",""):gsub(" Fruit",""):gsub("Fruit",""):gsub(" ","")
-                local score = Rank[name] or 1
-                if score > highest then
-                    highest = score
-                    best = tool
-                end
-            end
-        end
+local gotFruit = false
+
+for _, name in ipairs(FRUITS) do
+    local ok, result = pcall(function()
+        return CommF:InvokeServer("LoadFruit", name)
+    end)
+    print(("[%s] ok=%s | result=%s"):format(name, tostring(ok), tostring(result)))
+
+    if ok and result then
+        gotFruit = true
+        print(">> Lấy được: " .. name)
+        if STOP_AFTER_FIRST then break end
     end
-    check(LocalPlayer.Backpack)
-    if LocalPlayer.Character then check(LocalPlayer.Character) end
-    return best
+    task.wait(DELAY_BETWEEN)
 end
 
--- Chạy liên tục
-while true do
-    -- Đợi nhân vật load xong
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.CharacterAdded:Wait()
-        task.wait(1)
-    end
+task.wait(DELAY_BEFORE_RESET)
 
-    local fruit = getBestFruit()
-    if fruit then
-        fruit.Parent = LocalPlayer.Character
-        task.wait(0.4)
-    end
-
-    -- Reset
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.Health = 0
-    end
-
-    task.wait(2.5) -- đợi respawn rồi lặp lại
+if gotFruit then
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if hum then hum.Health = 0 end
+else
+    warn("Không lấy được trái nào, chưa reset. Xem console (F9).")
 end
